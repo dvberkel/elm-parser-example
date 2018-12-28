@@ -65,5 +65,20 @@ suite =
                     in
                     actual
                         |> Expect.equal expected
+            , test "parsing \"10a.2bc.3#!.19\" should parse as an identifier" <|
+                \_ ->
+                    let
+                        input =
+                            "10a.2bc.3#!.19"
+
+                        actual =
+                            Data.parse input
+
+                        expected =
+                            Ok <|
+                                Identifier "10"
+                    in
+                    actual
+                        |> Expect.equal expected
             ]
         ]
