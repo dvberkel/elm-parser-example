@@ -26,6 +26,8 @@ This repository contains Elm code that shows how a `elm/parser` can be used to s
 
 The starting point will be a skeletal Elm project created by running `elm init` and `elm-test init`.
 
+This walk through is meant to provide an example of `elm/parser` but it is expected that you are at least familiar with the [documentation](https://package.elm-lang.org/packages/elm/parser/latest/).
+
 ### Installing `elm/parser`
 Add the dependency to `elm/parser` is a good starting point.
 
@@ -136,3 +138,345 @@ suite =
             ]
         ]
 ```
+
+### Import `elm/parser`
+When working with `elm/parser` it is nice to freely use all the functionality. Therefore we expose all the bindings in the `Parser` name space.
+
+```elm
+import Parser exposing (..)
+```
+
+### Focusing on `Identifier`
+The beauty of `elm/parser` is that it allows you to focus on a single part and combine them later on. For now we will focus on a parser for the `Identifier`.
+
+We will start with the signature of the `identifier` function. This function is a `Parser Data` that will parse an `Identifier`
+
+```elm
+identifier : Parser Data
+```
+
+To implement the parser we take a look at the [`getChompedString`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#getChompedString) function. It takes a parser and returns the String that this parser consumed. It works with the family of `chomp...` functions like `chompIf`, `chompWhile` etcetera.
+
+We are going to look for the [`chompWhile: (Char -> Bool) -> Parser ()`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#chompWhile) function. From the documentation
+
+> Chomp zero or more characters if they pass the test. This is commonly useful for chomping whitespace or variable names
+
+We want to chomp digits for which we can use the [`Char.isDigit`](https://package.elm-lang.org/packages/elm/core/latest/Char#isDigit) function.
+
+The `getChompedString` returns a `String` and we want `Data` we can use the [`Parser.map`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#map) function to transform the parsed `String` into an `Identifier`.
+
+```elm
+identifier : Parser Data
+identifier =
+    chompWhile Char.isDigit
+        |> getChompedString
+        |> map Identifier
+```
+
+### Partial parsing input
+We now can use the `identifier` parser to make some of our tests pass. `elm/parser` provides a [`run`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#run) function that accepts a `Parser a` some input to parse and returns a `Result (List DeadEnd) a`.
+
+[`DeadEnd`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#DeadEnd) is a description of why a parser can get stuck. There is a [`deadEndsToString`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#deadEndsToString) function but unfortunately that is [not implemented](https://github.com/elm/parser/issues/9) sensible. We are going to use it anyway, and come back to it later.
+
+```elm
+parse : String -> Result String Data
+parse input =
+    let
+        parser =
+            identifier
+    in
+    input
+        |> run parser
+        |> Result.mapError deadEndsToString
+
+```
+
+We bound the `identifier` parser to `parser` in a `let`-block so that we can change the parser easily later on.
+
+This code now passes one of our tests.
+
+### Focus on `IpAddress`
+With the `identifier` under our belt, we continue with the `IpAddress`. The signature is similar
+
+```elm
+ipAddress : Parser Data
+```
+
+Now we will work in a top-down fashion. We will liberally dream up function that we will define until we find primitives that fit the bill.
+
+So below we define the `ipAddress` parser in terms of parsers we wish we had.
+
+```elm
+ipAddress : Parser Data
+ipAddress =
+    succeed IpAddressData
+        |= network
+        |. dot
+        |= network
+        |. dot
+        |= host
+        |. dot
+        |= host
+        |= optionalSubnetMask
+        |> map IpAddress
+```
+
+Newly introduces parsers are `network`, `dot`, `host`, and `optionalSubnetMask`. Here are their signatures.
+
+```elm
+network: Parser Int
+
+dot: Parser ()
+
+host: Parser Int
+
+optionalSubnetMask: Parser (Maybe Int)
+```
+
+#### `network`
+Let's focus on `network` for the moment. The network part is basically a sequence of digits with a length of one, two or three. We already know how to parse a sequence of digits. Once we have parsed the digits we want to succeed or fail depending on the number of digits we parsed.
+
+```elm
+network : Parser Int
+network =
+    let
+        toInt input =
+            input
+                |> String.toInt
+                |> MaybeWithDefaul -1
+    in
+    chompWhile Char.isDigit
+        |> getChompedString
+        |> andThen (lengthWithIn 1 3)
+        |> map toInt
+```
+
+Here you see the use of [`andThen`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#andThen). Its signature `(a -> Parser b) -> Parser a -> Parser b` allows you to return a parser depending on the result of an other parser. We use it to succeed or fail depending on the length of the parsed digits.
+
+```elm
+lengthWithIn : Int -> Int -> String -> Parser String
+lengthWithIn minimum maximum input =
+    let
+        n =
+            String.length input
+    in
+    if minimum <= n && n <= maximum then
+        succeed input
+
+    else
+        problem <|
+            "expecting input to be between "
+                ++ String.fromInt minimum
+                ++ " and "
+                ++ String.fromInt maximum
+```
+
+Here the [`succeed`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#succeed) return the input and [`problem`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#problem) signals the failure.
+
+#### `host`
+`host` is exactly alike to `network`. One could create a single function and alias `network` and `host` to it.
+
+#### `dot`
+The `dot` parser parses `'.'`. The `elm/parser` package exposes [`symbol`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#symbol) for this situation.
+
+```elm
+dot : Parser ()
+dot =
+    symbol "."
+```
+
+#### `optionalSubnetMask`
+Arguably `optionalSubnetMask` is the most interesting. For this we will first focus on assuming the subnet-mask is always present. For this we create a `subnetMask` parser.
+
+```elm
+subnetMask : Parser Int
+subnetMask =
+    let
+        toInt input =
+            input
+                |> String.dropLeft 1
+                |> String.toInt
+                |> Maybe.withDefault -1
+    in
+    succeed ()
+        |> chompIf '/'
+        |> chompWhile Char.isDigit
+        |> getChompedString
+        |> map toInt
+```
+
+Nothing new is presented here. We first chomp if the character is `'/'` and then chomp a sequence of digits. Because we also had chomped a `'/'` we need to drop that character when we convert it to a integer.
+
+Now we are going to write an higher order function that will accept a `Parser a` and returns a `Parser (Maybe a)`. This allows us to make any parser optionally.
+
+```elm
+optionally : Parser a -> Parser (Maybe a)
+optionally parser =
+    oneOf
+        [ parser |> map Just
+        , succeed Nothing
+        ]
+```
+
+[oneOf](https://package.elm-lang.org/packages/elm/parser/latest/Parser#oneOf) is a parser
+
+> will keep trying parsers until oneOf them starts chomping characters. 
+
+So we take our `parser` and create a new parser that wraps the result of `parser` in a `Just`. If that does not succeed, we accept `Nothing`.
+
+`optionalSubnetMask` can now be implemented.
+
+```elm
+optionalSubnetMask : Parser (Maybe Int)
+optionalSubnetMask =
+    optionally subnetMask
+```
+
+### Parsing IpAddress or Identifier
+`oneOf` can now also be used to implement our `parse` function. Instead of the `parser = identifier` in the let block, we should used
+
+```elm
+        parser =
+            oneOf
+                [ backtrackable ipAddress
+                , identifier
+                ]
+```
+
+The most notable new concept is [`backtrackable`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#backtrackable). It is needed because oneOf will otherwise not choose a different path. Both ipAddress and identifier start with a sequence of digits, so `oneOf` will chomp characters in both cases. With backtrackable we allow `oneOf` to pick the alternate path.
+
+## Test pass
+With this definition the tests pass. The entire parser is given below.
+
+```elm
+module Data exposing (Data(..), parse)
+
+import Parser exposing (..)
+
+
+type Data
+    = Identifier String
+    | IpAddress IpAddressData
+
+
+type alias IpAddressData =
+    { networkID1 : Int
+    , networkID2 : Int
+    , hostID1 : Int
+    , hostID2 : Int
+    , subnetMask : Maybe Int
+    }
+
+
+parse : String -> Result String Data
+parse input =
+    let
+        parser =
+            oneOf
+                [ backtrackable ipAddress
+                , identifier
+                ]
+    in
+    input
+        |> run parser
+        |> Result.mapError deadEndsToString
+
+
+identifier : Parser Data
+identifier =
+    chompWhile Char.isDigit
+        |> getChompedString
+        |> map Identifier
+
+
+ipAddress : Parser Data
+ipAddress =
+    succeed IpAddressData
+        |= network
+        |. dot
+        |= network
+        |. dot
+        |= host
+        |. dot
+        |= host
+        |= optionalSubnetMask
+        |> map IpAddress
+
+
+network : Parser Int
+network =
+    let
+        toInt input =
+            input
+                |> String.toInt
+                |> Maybe.withDefault -1
+    in
+    chompWhile Char.isDigit
+        |> getChompedString
+        |> andThen (lengthWithIn 1 3)
+        |> map toInt
+
+
+lengthWithIn : Int -> Int -> String -> Parser String
+lengthWithIn minimum maximum input =
+    let
+        n =
+            String.length input
+    in
+    if minimum <= n && n <= maximum then
+        succeed input
+
+    else
+        problem <|
+            "expecting input to be between "
+                ++ String.fromInt minimum
+                ++ " and "
+                ++ String.fromInt maximum
+
+
+host : Parser Int
+host =
+    network
+
+
+dot : Parser ()
+dot =
+    symbol "."
+
+
+subnetMask : Parser Int
+subnetMask =
+    let
+        toInt input =
+            input
+                |> String.dropLeft 1
+                |> String.toInt
+                |> Maybe.withDefault -1
+    in
+    (succeed ()
+        |. chompIf (\c -> c == '/')
+        |. chompWhile Char.isDigit
+    )
+        |> getChompedString
+        |> map toInt
+
+
+optionally : Parser a -> Parser (Maybe a)
+optionally parser =
+    oneOf
+        [ parser |> map Just
+        , succeed Nothing
+        ]
+
+
+optionalSubnetMask : Parser (Maybe Int)
+optionalSubnetMask =
+    optionally subnetMask
+```
+
+## Considerations
+We made some choices that could have been made differently. Below we summarize them.
+
+* Instead of using `getChompedString` we could have used `int`.
+* Instead of using `getChompedString` and the general `Parser.map` we could have used `mapChompedString`.
+* We haven't done error reporting.
