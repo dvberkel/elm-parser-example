@@ -32,3 +32,24 @@ Add the dependency to `elm/parser` is a good starting point.
 ```sh
 elm install elm/parser
 ```
+
+### Model data
+The next part is to model the data we want to end up with. The question provides a suggestion, but is does not expose the internal structure of the data. In order to provide some insight in how to parse rich data structures, we our modeling our data as follows. 
+
+```elm
+module Data exposing (Data(..))
+
+
+type Data
+    = Identifier String
+    | IpAddress IpAddressData
+
+
+type alias IpAddressData =
+    { networkID1 : Int
+    , networkID2 : Int
+    , hostID1 : Int
+    , hostID2 : Int
+    , subnetMask : Maybe Int
+    }
+```
