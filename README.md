@@ -1,2 +1,2 @@
-# elm-parser-example
-Creating an `elm/parser` from as an answer to a Slack question.
+# `elm/parser` Example
+Creating an `elm/parser` as an answer to a Slack question.
