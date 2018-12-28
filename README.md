@@ -25,3 +25,10 @@ On Wednesday 26th of December 2018 **ajgreenb** asked the [following question](h
 This repository contains Elm code that shows how a `elm/parser` can be used to solve ajgreenb problem. Furthermore, this README describes the rational behind some of the decisions.
 
 The starting point will be a skeletal Elm project created by running `elm init` and `elm-test init`.
+
+### Installing `elm/parser`
+Add the dependency to `elm/parser` is a good starting point.
+
+```sh
+elm install elm/parser
+```
