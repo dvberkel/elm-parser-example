@@ -1,4 +1,4 @@
-module Data exposing (Data(..), parse)
+module Data exposing (Data(..), parse, parseComplete)
 
 import Parser exposing (..)
 
@@ -25,6 +25,25 @@ parse input =
                 [ backtrackable ipAddress
                 , identifier
                 ]
+    in
+    input
+        |> run parser
+        |> Result.mapError deadEndsToString
+
+
+parseComplete : String -> Result String Data
+parseComplete input =
+    let
+        incompleteParser =
+            oneOf
+                [ backtrackable ipAddress
+                , identifier
+                ]
+
+        parser =
+            succeed identity
+                |= incompleteParser
+                |. end
     in
     input
         |> run parser

@@ -80,5 +80,19 @@ suite =
                     in
                     actual
                         |> Expect.equal expected
+            , test "parsing \"10a.2bc.3#!.19\" with `parseComplete` should fail" <|
+                \_ ->
+                    let
+                        input =
+                            "10a.2bc.3#!.19"
+
+                        actual =
+                            Data.parseComplete input
+
+                        expected =
+                            Err "TODO deadEndsToString"
+                    in
+                    actual
+                        |> Expect.equal expected
             ]
         ]

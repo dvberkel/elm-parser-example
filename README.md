@@ -472,6 +472,58 @@ optionally parser =
 optionalSubnetMask : Parser (Maybe Int)
 optionalSubnetMask =
     optionally subnetMask
+``` 
+
+### Part of input
+At the moment our `parse` function would happily only parse a part of the input. For example if one would try to parse `"10a.2bc.3#!.19"` the result would be `Ok (Identifier "10")` as can be seen by the following repl session.
+
+```plain
+> import Data exposing (parse)
+> parse "10a.2bc.3#!.19"
+Ok (Identifier "10") : Result String Data.Data
+```
+
+We can remedy that by using the [`end`](https://package.elm-lang.org/packages/elm/parser/latest/Parser#end) parser.
+
+In order not to disturb other test we will expose a `parseComplete` function.
+
+```elm
+parseComplete : String -> Result String Data
+parseComplete input =
+    let
+        incompleteParser =
+            oneOf
+                [ backtrackable ipAddress
+                , identifier
+                ]
+
+        parser =
+            succeed identity
+                |= incompleteParser
+                |. end
+    in
+    input
+        |> run parser
+        |> Result.mapError deadEndsToString
+```
+
+which will pass the following test
+
+```test
+            , test "parsing \"10a.2bc.3#!.19\" with `parseComplete` should fail" <|
+                \_ ->
+                    let
+                        input =
+                            "10a.2bc.3#!.19"
+
+                        actual =
+                            Data.parseComplete input
+
+                        expected =
+                            Err "TODO deadEndsToString"
+                    in
+                    actual
+                        |> Expect.equal expected
 ```
 
 ## Considerations
