@@ -21,3 +21,7 @@ On Wednesday 26th of December 2018 **ajgreenb** asked the [following question](h
 >
 >and then i could `List.map toA [ "2293487", "10.128.16.255", "192.168.1.2/32" ]`. does what i'm trying to do make sense? and does anyone have a suggestion for a good way to do that?
 
+## Answer
+This repository contains Elm code that shows how a `elm/parser` can be used to solve ajgreenb problem. Furthermore, this README describes the rational behind some of the decisions.
+
+The starting point will be a skeletal Elm project created by running `elm init` and `elm-test init`.
