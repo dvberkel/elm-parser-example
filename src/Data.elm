@@ -1,4 +1,4 @@
-module Data exposing (Data(..))
+module Data exposing (Data(..), parse)
 
 
 type Data
@@ -13,3 +13,8 @@ type alias IpAddressData =
     , hostID2 : Int
     , subnetMask : Maybe Int
     }
+
+
+parse : String -> Result String Data
+parse input =
+    Err "not yet implemented"

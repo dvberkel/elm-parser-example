@@ -53,3 +53,86 @@ type alias IpAddressData =
     , subnetMask : Maybe Int
     }
 ```
+
+### Provide `parse` function
+Next we create a `parse` function and setup a test to check our intended API in a test. Because parsing can fail, we will need to return a `Result`.
+
+```elm
+parse : String -> Result String Data
+parse input =
+    Err "not yet implemented"
+```
+
+From the examples provided in the question we can extract the following tests. Note that the tests will fail at the moment.
+
+```elm
+module ParserTest exposing (suite)
+
+import Data exposing (Data(..))
+import Expect exposing (Expectation)
+import Test exposing (..)
+
+
+suite : Test
+suite =
+    describe "Data"
+        [ describe "parse"
+            [ test "parse identifier" <|
+                \_ ->
+                    let
+                        input =
+                            "2293487"
+
+                        actual =
+                            Data.parse input
+
+                        expected =
+                            Ok <| Identifier input
+                    in
+                    actual
+                        |> Expect.equal expected
+            , test "parse IP address" <|
+                \_ ->
+                    let
+                        input =
+                            "10.128.16.255"
+
+                        actual =
+                            Data.parse input
+
+                        expected =
+                            Ok <|
+                                IpAddress
+                                    { networkID1 = 10
+                                    , networkID2 = 128
+                                    , hostID1 = 16
+                                    , hostID2 = 255
+                                    , subnetMask = Nothing
+                                    }
+                    in
+                    actual
+                        |> Expect.equal expected
+            , test "parse IP address with a subnet mask" <|
+                \_ ->
+                    let
+                        input =
+                            "10.128.16.255/32"
+
+                        actual =
+                            Data.parse input
+
+                        expected =
+                            Ok <|
+                                IpAddress
+                                    { networkID1 = 10
+                                    , networkID2 = 128
+                                    , hostID1 = 16
+                                    , hostID2 = 255
+                                    , subnetMask = Just 32
+                                    }
+                    in
+                    actual
+                        |> Expect.equal expected
+            ]
+        ]
+```
